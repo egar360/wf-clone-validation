@@ -19,13 +19,13 @@ process assembleCore_flye {
         cluster_dir = "trycycler/cluster_001"
         int coverage_target = params.assm_coverage * 3
         int min_dep = (params.assm_coverage / 3) * 2
-        int min_len = 100
+        int min_len = 1
         int max_len = (approx_size as Integer) * 1.2
         int min_q = 7
         int exit_number = task.attempt <= 4 ? 1 : 0
         // min_overlap normally auto calculated but with a lower limit of 3000
         // assembly with same size as overlap will likely fail
-        def min_overlap = approx_size.toInteger() <= 3000 ? '--min-overlap 1000' : ''
+        def min_overlap = approx_size.toInteger() <= 3000 ? '--min-overlap 2000' : ''
         def meta = params.non_uniform_coverage ? '--meta' : ''
         def seqkit_threads = params.threads >= 6 ? 2 : 1
     """
