@@ -6,7 +6,7 @@
     "workflow_title": "Clone validation workflow",
     "demo_url": "https://ont-exd-int-s3-euwst1-epi2me-labs.s3.amazonaws.com/wf-clone-validation/wf-clone-validation-demo.tar.gz",
     "aws_demo_url": "https://ont-exd-int-s3-euwst1-epi2me-labs.s3.amazonaws.com/wf-clone-validation/wf-clone-validation-demo/aws.nextflow.config",
-    "url": "https://github.com/epi2me-labs/wf-clone-validation",
+    "url": "https://github.com/egar360/wf-clone-validation",
     "type": "object",
     "definitions": {
         "input_options": {
