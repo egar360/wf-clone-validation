@@ -28,6 +28,7 @@ process assembleCore_flye {
         def min_overlap = approx_size.toInteger() <= 3000 ? '--min-overlap 2000' : ''
         def meta = params.non_uniform_coverage ? '--meta' : ''
         def seqkit_threads = params.threads >= 6 ? 2 : 1
+        def subset_count = params.subsets
     """
     # STATUS is changed after a command succeeds and is related to the following section
     # This is because we can't put comments in a multiline cmd
@@ -54,7 +55,7 @@ process assembleCore_flye {
     ############################################################
     STATUS="Failed to Subset reads" &&
     (trycycler subsample \
-        --count 6 \
+        --count $subset_count \
         --min_read_depth $min_dep \
         --reads "${sample_id}.downsampled.fastq" \
         --out_dir sets \

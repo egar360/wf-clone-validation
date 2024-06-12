@@ -38,6 +38,14 @@
                     "minimum": 1,
                     "help_text": "This is the coverage that will be used to subsample reads to use for the assembly."
                 },
+                "subsets": {
+                    "type": "integer",
+                    "title": "Number of subsets",
+                    "default": 3,
+                    "description": "How many parallel assemblies to form",
+                    "minimum": 3,
+                    "help_text": "This is the number of subset read groups that will be assembled before consensus generation."
+                },
                 "primers": {
                     "type": "string",
                     "format": "file-path",

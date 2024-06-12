@@ -29,6 +29,7 @@ process assembleCore_canu {
         -purgeOverlaps=false \
         -saveOverlaps=true """ : ""
         def seqkit_threads = params.threads >= 6 ? 2 : 1
+        def subset_count = params.subsets
 
     """
 
@@ -55,7 +56,7 @@ process assembleCore_canu {
     ############################################################
     STATUS="Failed to Subset reads" &&
     (trycycler subsample \
-        --count 3 \
+        --count $subset_count \
         --min_read_depth $min_dep \
         --reads "${sample_id}.downsampled.fastq" \
         --out_dir sets \
