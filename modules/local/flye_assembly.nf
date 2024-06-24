@@ -25,7 +25,18 @@ process assembleCore_flye {
         int exit_number = task.attempt <= 4 ? 1 : 0
         // min_overlap normally auto calculated but with a lower limit of 3000
         // assembly with same size as overlap will likely fail
-        def min_overlap = approx_size.toInteger() <= 3000 ? '--min-overlap 2000' : ''
+        // def min_overlap = approx_size.toInteger() <= 3000 ? '--min-overlap 2000' : ''
+        def min_overlap
+            if (approx_size.toInteger() <= 1500) {
+                min_overlap = '--min-overlap 1000'
+            } else if (approx_size.toInteger() <= 2000) {
+                min_overlap = '--min-overlap 1500'
+            } else if (approx_size.toInteger() <= 3000) {
+                min_overlap = '--min-overlap 2000'
+            } else {
+                min_overlap = ''
+            }
+            
         def meta = params.non_uniform_coverage ? '--meta' : ''
         def seqkit_threads = params.threads >= 6 ? 2 : 1
         def subset_count = params.subsets
