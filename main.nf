@@ -649,8 +649,8 @@ workflow {
         min_read_length,
         max_read_length)
 
-    output(results[0])
-   
+    results[0]
+    | output  
 }
 
 workflow.onComplete {
