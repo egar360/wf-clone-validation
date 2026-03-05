@@ -113,7 +113,7 @@ process assembleCore_canu {
     (trycycler reconcile \
         --reads "${meta.alias}.downsampled.fastq" \
         --cluster_dir $cluster_dir \
-        --max_trim_seq_percent 1 \
+        --max_trim_seq_percent 0 \
         --max_add_seq_percent 10) &&
     (trycycler msa --cluster_dir $cluster_dir) &&
     (trycycler partition --reads "${meta.alias}.downsampled.fastq" --cluster_dirs $cluster_dir) &&
