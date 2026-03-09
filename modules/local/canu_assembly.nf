@@ -115,7 +115,7 @@ process assembleCore_canu {
     
     # 2) Filter contigs BEFORE reconcile (fix >26 contigs + length outliers)
     STATUS="Failed to filter contigs for Trycycler reconcile" &&
-    python3 $(command -v filter_trycycler_contigs.py) \
+    python3 filter_trycycler_contigs.py \
         --approx_size ${meta.approx_size} \
         --cluster_dir $cluster_dir \
         --phylip trycycler/contigs.phylip \
