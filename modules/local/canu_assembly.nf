@@ -22,7 +22,6 @@ process assembleCore_canu {
         int min_len = 100
         int max_len = (meta.approx_size as Integer) * 1.2
         def fast = params.canu_fast == true ? '-fast' : ''
-        // WSL does not support named pipes used by Canu, setting these parameters avoids their use
         def windows_params = System.properties['os.version'].toLowerCase().contains("wsl") ? """\
         -mhapPipe=false \
         -purgeOverlaps=false \
@@ -42,208 +41,213 @@ process assembleCore_canu {
     mkdir -p fallback_candidates
     echo -e "attempt\\tstage\\tmessage" > fallback_candidates/attempt_log.tsv
 
-    while [ $attempt -le $max_attempts ]; do
-        echo "[attempt $attempt/$max_attempts] starting from trimming" 1>&2
-        echo -e "$attempt\\tBEGIN\\tstarting" >> fallback_candidates/attempt_log.tsv
+    while [ \$attempt -le \$max_attempts ]; do
+        echo "[attempt \$attempt/\$max_attempts] starting from trimming" 1>&2
+        echo -e "\$attempt\\tBEGIN\\tstarting" >> fallback_candidates/attempt_log.tsv
 
         # Clean per-attempt dirs/files (but keep fallbacks)
         rm -rf sets assm_sample_* trycycler *.deconcat.fasta *.trimmed.fasta 2>/dev/null || true
         rm -f "${meta.alias}.trimmed.fastq" "${meta.alias}.downsampled.fastq" 2>/dev/null || true
 
         ############################################################
-        # Trimming (per-attempt now)
+        # Trimming (per-attempt)
         ############################################################
-        STATUS="Failed to trim reads (attempt $attempt)"
+        STATUS="Failed to trim reads (attempt \$attempt)"
         if ! (
             if [[ $params.trim_length -gt 0 ]]; then
                 seqkit subseq -j $seqkit_threads -r $params.trim_length:-$params.trim_length $fastq
             else
                 cat $fastq
-            fi \
-            | seqkit subseq -j $seqkit_threads -r 1:$max_len \
+            fi \\
+            | seqkit subseq -j $seqkit_threads -r 1:$max_len \\
             | seqkit seq -j $seqkit_threads -m $min_len -Q $params.min_quality -g > "${meta.alias}.trimmed.fastq"
         ); then
-            echo -e "$attempt\\ttrim\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\ttrim\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         ############################################################
-        # Downsampling (per-attempt now)
+        # Downsampling (per-attempt)
         ############################################################
-        STATUS="Failed to downsample reads (attempt $attempt)"
-        if ! rasusa \
-            --coverage $coverage_target \
-            --genome-size ${meta.approx_size} \
+        STATUS="Failed to downsample reads (attempt \$attempt)"
+        if ! rasusa \\
+            --coverage $coverage_target \\
+            --genome-size ${meta.approx_size} \\
             --input "${meta.alias}.trimmed.fastq" > "${meta.alias}.downsampled.fastq"; then
-            echo -e "$attempt\\tdownsample\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tdownsample\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
-        md5sum "${meta.alias}.downsampled.fastq" 2>/dev/null | awk '{print $1}' > "fallback_candidates/attempt${attempt}_downsample_md5.txt" || true
+        md5sum "${meta.alias}.downsampled.fastq" 2>/dev/null | awk '{print \$1}' > "fallback_candidates/attempt\${attempt}_downsample_md5.txt" || true
 
         ############################################################
         # Subsetting (Trycycler subsample)
         ############################################################
-        STATUS="Failed to Subset reads (attempt $attempt)"
-        if ! trycycler subsample \
-            --count 3 \
-            --min_read_depth $min_dep \
-            --reads "${meta.alias}.downsampled.fastq" \
-            --out_dir sets \
+        STATUS="Failed to Subset reads (attempt \$attempt)"
+        if ! trycycler subsample \\
+            --count 3 \\
+            --min_read_depth $min_dep \\
+            --reads "${meta.alias}.downsampled.fastq" \\
+            --out_dir sets \\
             --genome_size ${meta.approx_size}; then
-            echo -e "$attempt\\tsubsample\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tsubsample\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if ! ls sets/sample_*.fastq >/dev/null 2>&1; then
-            echo "[attempt $attempt] subsample produced no read sets" 1>&2
-            echo -e "$attempt\\tsubsample\\tno_sets_created" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] subsample produced no read sets" 1>&2
+            echo -e "\$attempt\\tsubsample\\tno_sets_created" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
-        md5sum sets/sample_*.fastq 2>/dev/null | sort > "fallback_candidates/attempt${attempt}_subsample_md5.txt" || true
+        md5sum sets/sample_*.fastq 2>/dev/null | sort > "fallback_candidates/attempt\${attempt}_subsample_md5.txt" || true
 
         ############################################################
-        # Assembly (Canu) on the subsets
+        # Assembly (Canu) on the subsets (no \$(...) used)
         ############################################################
-        STATUS="Failed to assemble using Canu (attempt $attempt)"
+        STATUS="Failed to assemble using Canu (attempt \$attempt)"
         canu_ok=1
-        for SUBSET in $(ls sets/sample_*.fastq); do
-            SUBSET_NAME=$(basename -s .fastq $SUBSET)
-            canu \
-                -p $SUBSET_NAME \
-                -d assm_${SUBSET_NAME} \
-                -maxThreads=$task.cpus \
-                genomeSize=${meta.approx_size} \
-                $fast \
-                -nanopore $SUBSET \
+        for SUBSET in sets/sample_*.fastq; do
+            SUBSET_NAME="\${SUBSET##*/}"
+            SUBSET_NAME="\${SUBSET_NAME%.fastq}"
+            canu \\
+                -p "\$SUBSET_NAME" \\
+                -d "assm_\${SUBSET_NAME}" \\
+                -maxThreads=$task.cpus \\
+                genomeSize=${meta.approx_size} \\
+                $fast \\
+                -nanopore "\$SUBSET" \\
                 $windows_params || canu_ok=0
         done
 
-        if [ $canu_ok -eq 0 ] && ! ls assm_sample_0*/*.contigs.fasta >/dev/null 2>&1; then
-            echo "[attempt $attempt] canu failed (no contigs)" 1>&2
-            echo -e "$attempt\\tcanu\\tno_contigs" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+        if [ \$canu_ok -eq 0 ] && ! ls assm_sample_0*/*.contigs.fasta >/dev/null 2>&1; then
+            echo "[attempt \$attempt] canu failed (no contigs)" 1>&2
+            echo -e "\$attempt\\tcanu\\tno_contigs" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         ############################################################
-        # Trim assemblies + deconcatenate
+        # Trim assemblies + deconcatenate (no \$(...) used)
         ############################################################
-        STATUS="Failed to trim/deconcatenate assemblies (attempt $attempt)"
-        for assembly in $(ls assm_sample_0*/*.contigs.fasta 2>/dev/null); do
-            assembly_name=$(basename -s .fasta $assembly)
-            trim.py "$assembly" -o "${assembly_name}.trimmed.fasta" || true
-            deconcatenate.py \
-                "${assembly_name}.trimmed.fasta" \
-                -o "${assembly_name}.deconcat.fasta" \
+        STATUS="Failed to trim/deconcatenate assemblies (attempt \$attempt)"
+        shopt -s nullglob
+        for assembly in assm_sample_0*/*.contigs.fasta; do
+            assembly_name="\${assembly##*/}"
+            assembly_name="\${assembly_name%.fasta}"
+            trim.py "\$assembly" -o "\${assembly_name}.trimmed.fasta" || true
+            deconcatenate.py \\
+                "\${assembly_name}.trimmed.fasta" \\
+                -o "\${assembly_name}.deconcat.fasta" \\
                 --approx_size ${meta.approx_size} || true
         done
+        shopt -u nullglob
 
         if ! ls *.deconcat.fasta >/dev/null 2>&1; then
-            echo "[attempt $attempt] no deconcat contigs produced" 1>&2
-            echo -e "$attempt\\tdeconcat\\tno_deconcat_fastas" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] no deconcat contigs produced" 1>&2
+            echo -e "\$attempt\\tdeconcat\\tno_deconcat_fastas" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         ############################################################
         # Trycycler cluster
         ############################################################
-        STATUS="Failed to cluster contigs (attempt $attempt)"
-        if ! trycycler cluster \
-            --assemblies *.deconcat.fasta \
-            --reads "${meta.alias}.downsampled.fastq" \
+        STATUS="Failed to cluster contigs (attempt \$attempt)"
+        if ! trycycler cluster \\
+            --assemblies *.deconcat.fasta \\
+            --reads "${meta.alias}.downsampled.fastq" \\
             --out_dir trycycler; then
-            echo -e "$attempt\\tcluster\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tcluster\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if [ ! -d "$cluster_dir/1_contigs" ]; then
-            echo "[attempt $attempt] trycycler cluster did not produce cluster_001" 1>&2
-            echo -e "$attempt\\tcluster\\tmissing_cluster_001" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] trycycler cluster did not produce cluster_001" 1>&2
+            echo -e "\$attempt\\tcluster\\tmissing_cluster_001" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         # Save 1_contigs candidates for this attempt (always)
+        shopt -s nullglob
         for f in $cluster_dir/1_contigs/*.fasta; do
-            [ -e "$f" ] || continue
-            cp -f "$f" "fallback_candidates/attempt${attempt}_$(basename "$f")" 2>/dev/null || true
+            cp -f "\$f" "fallback_candidates/attempt\${attempt}_\${f##*/}" 2>/dev/null || true
         done
+        shopt -u nullglob
 
         ############################################################
         # Filter contigs BEFORE reconcile
         ############################################################
-        STATUS="Failed to filter contigs (attempt $attempt)"
-        if ! python3 ${workflow.projectDir}/bin/filter_trycycler_contigs.py \
-            --approx_size ${meta.approx_size} \
-            --cluster_dir $cluster_dir \
-            --phylip trycycler/contigs.phylip \
+        STATUS="Failed to filter contigs (attempt \$attempt)"
+        if ! python3 ${workflow.projectDir}/bin/filter_trycycler_contigs.py \\
+            --approx_size ${meta.approx_size} \\
+            --cluster_dir $cluster_dir \\
+            --phylip trycycler/contigs.phylip \\
             --max_keep 26; then
-            echo "[attempt $attempt] filter failed" 1>&2
-            echo -e "$attempt\\tfilter\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] filter failed" 1>&2
+            echo -e "\$attempt\\tfilter\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         ############################################################
         # Reconcile + MSA + partition + consensus
         ############################################################
-        STATUS="Failed to reconcile assemblies (attempt $attempt)"
-        if ! trycycler reconcile \
-            --reads "${meta.alias}.downsampled.fastq" \
-            --cluster_dir $cluster_dir \
-            --max_trim_seq_percent 5 \
+        STATUS="Failed to reconcile assemblies (attempt \$attempt)"
+        if ! trycycler reconcile \\
+            --reads "${meta.alias}.downsampled.fastq" \\
+            --cluster_dir $cluster_dir \\
+            --max_trim_seq_percent 5 \\
             --max_add_seq_percent 10; then
-            echo -e "$attempt\\treconcile\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\treconcile\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if [ ! -s "$cluster_dir/2_all_seqs.fasta" ]; then
-            echo "[attempt $attempt] reconcile did not produce 2_all_seqs.fasta" 1>&2
-            echo -e "$attempt\\treconcile\\tmissing_2_all_seqs" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] reconcile did not produce 2_all_seqs.fasta" 1>&2
+            echo -e "\$attempt\\treconcile\\tmissing_2_all_seqs" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
-        cp -f "$cluster_dir/2_all_seqs.fasta" "fallback_candidates/attempt${attempt}_2_all_seqs.fasta" 2>/dev/null || true
+        cp -f "$cluster_dir/2_all_seqs.fasta" "fallback_candidates/attempt\${attempt}_2_all_seqs.fasta" 2>/dev/null || true
 
-        STATUS="Failed to run Trycycler MSA/partition/consensus (attempt $attempt)"
+        STATUS="Failed to run Trycycler MSA/partition/consensus (attempt \$attempt)"
         if ! trycycler msa --cluster_dir $cluster_dir; then
-            echo -e "$attempt\\tmsa\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tmsa\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if ! trycycler partition --reads "${meta.alias}.downsampled.fastq" --cluster_dirs $cluster_dir; then
-            echo -e "$attempt\\tpartition\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tpartition\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if ! trycycler consensus --cluster_dir $cluster_dir; then
-            echo -e "$attempt\\tconsensus\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo -e "\$attempt\\tconsensus\\tcommand_failed" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
 
         if [ -s "$cluster_dir/7_final_consensus.fasta" ]; then
             mv "$cluster_dir/7_final_consensus.fasta" "${meta.alias}.reconciled.fasta"
-            STATUS="Completed successfully (attempt $attempt)"
-            echo -e "$attempt\\tSUCCESS\\tconsensus_written" >> fallback_candidates/attempt_log.tsv
+            STATUS="Completed successfully (attempt \$attempt)"
+            echo -e "\$attempt\\tSUCCESS\\tconsensus_written" >> fallback_candidates/attempt_log.tsv
             final_ok=1
             break
         else
-            echo "[attempt $attempt] consensus not produced" 1>&2
-            echo -e "$attempt\\tconsensus\\tmissing_7_final_consensus" >> fallback_candidates/attempt_log.tsv
-            attempt=$((attempt+1))
+            echo "[attempt \$attempt] consensus not produced" 1>&2
+            echo -e "\$attempt\\tconsensus\\tmissing_7_final_consensus" >> fallback_candidates/attempt_log.tsv
+            attempt=\$((attempt+1))
             continue
         fi
     done
@@ -251,27 +255,28 @@ process assembleCore_canu {
     ############################################################
     # Final fallback selection (if no attempt succeeded)
     ############################################################
-    if [ $final_ok -ne 1 ]; then
-        echo "[final] no consensus after $max_attempts attempts, selecting best fallback" 1>&2
-        STATUS="FALLBACK after ${max_attempts} attempts"
+    if [ \$final_ok -ne 1 ]; then
+        echo "[final] no consensus after \$max_attempts attempts, selecting best fallback" 1>&2
+        STATUS="FALLBACK after \${max_attempts} attempts"
 
         best=""
         best_diff=999999999
 
+        shopt -s nullglob
         for f in fallback_candidates/attempt*_*.fasta; do
-            [ -e "$f" ] || continue
-            len=$(seqkit fx2tab -n -l "$f" 2>/dev/null | awk '{print $2}' | head -n 1)
-            [ -n "$len" ] || continue
-            diff=$(( len > approx_size ? len-approx_size : approx_size-len ))
-            if [ $diff -lt $best_diff ]; then
-                best_diff=$diff
-                best="$f"
+            len=\$(seqkit fx2tab -n -l "\$f" 2>/dev/null | awk '{print \$2}' | head -n 1)
+            [ -n "\$len" ] || continue
+            diff=\$(( len > approx_size ? len-approx_size : approx_size-len ))
+            if [ \$diff -lt \$best_diff ]; then
+                best_diff=\$diff
+                best="\$f"
             fi
         done
+        shopt -u nullglob
 
-        if [ -n "$best" ]; then
-            cp -f "$best" "${meta.alias}.reconciled.fasta"
-            echo "[final] selected $best (diff=$best_diff)" 1>&2
+        if [ -n "\$best" ]; then
+            cp -f "\$best" "${meta.alias}.reconciled.fasta"
+            echo "[final] selected \$best (diff=\$best_diff)" 1>&2
         else
             echo "[final] no fallback candidates found" 1>&2
         fi
